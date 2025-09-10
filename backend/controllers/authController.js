@@ -1,65 +1,64 @@
-import User from "../models/User.js";
-import jwt from "jsonwebtoken";
+import jwt from 'jsonwebtoken';
+import User from '../models/UserModel.js'; 
 
-// Generate JWT
+// This function creates a real token using the database-generated user ID
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, {
-    expiresIn: "30d",
-  });
+    return jwt.sign({ id }, process.env.JWT_SECRET, {
+        expiresIn: '30d',
+    });
 };
 
 // @desc    Register a new user
-// @route   POST /api/auth/register
-export const registerUser = async (req, res) => {
-  const { name, email, password } = req.body;
+const registerUser = async (req, res) => {
+    const { name, email, password } = req.body;
+    try {
+        const userExists = await User.findOne({ email });
+        if (userExists) {
+            return res.status(400).json({ message: 'User already exists' });
+        }
+        
+        // Let Mongoose/MongoDB create the user and its unique _id
+        const user = await User.create({ name, email, password });
 
-  try {
-    const userExists = await User.findOne({ email });
-
-    if (userExists) {
-      return res.status(400).json({ success: false, error: "User already exists" });
+        if (user) {
+            // Send back the real, database-generated user._id
+            res.status(201).json({
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                isAdmin: user.isAdmin,
+                token: generateToken(user._id), // Create the token with the real _id
+            });
+        } else {
+            res.status(400).json({ message: 'Invalid user data' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error during registration' });
     }
-
-    const user = await User.create({
-      name,
-      email,
-      password,
-    });
-
-    if (user) {
-      res.status(201).json({
-        success: true,
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        token: generateToken(user._id),
-      });
-    }
-  } catch (error) {
-    res.status(400).json({ success: false, error: error.message });
-  }
 };
 
-// @desc    Auth user & get token
-// @route   POST /api/auth/login
-export const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+// @desc    Authenticate user & get token
+const loginUser = async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const user = await User.findOne({ email });
 
-  try {
-    const user = await User.findOne({ email }).select("+password");
-
-    if (user && (await user.matchPassword(password))) {
-      res.json({
-        success: true,
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        token: generateToken(user._id),
-      });
-    } else {
-      res.status(401).json({ success: false, error: "Invalid credentials" });
+        if (user && (await user.matchPassword(password))) {
+            // Send back the real, database-generated user._id
+            res.json({
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                isAdmin: user.isAdmin,
+                token: generateToken(user._id), // Create the token with the real _id
+            });
+        } else {
+            res.status(401).json({ message: 'Invalid email or password' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error during login' });
     }
-  } catch (error) {
-     res.status(500).json({ success: false, error: "Server error" });
-  }
 };
+
+export { registerUser, loginUser };
+

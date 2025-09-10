@@ -1,11 +1,13 @@
 import express from 'express';
-import { protect } from '../middleware/authMiddleware.js';
-import { adminProtect } from '../middleware/adminMiddleware.js';
-import { getAllUsers } from '../controllers/adminController.js';
-
 const router = express.Router();
+import { getDashboardStats, getAllUsers, getAllFiles } from '../controllers/adminController.js';
+import { protect, admin } from '../middleware/authMiddleware.js';
 
-// Route to get all users - only accessible to admins
-router.route('/users').get(protect, adminProtect, getAllUsers);
+// All routes in this file are protected and for admins only
+router.use(protect, admin);
+
+router.get('/stats', getDashboardStats);
+router.get('/users', getAllUsers);
+router.get('/files', getAllFiles);
 
 export default router;
